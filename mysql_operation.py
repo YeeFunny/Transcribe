@@ -39,18 +39,15 @@ class MysqlOpn:
 
     def query_merge_records(self):
         # List all records need to be merged
-        merge = []
-        self.__cursor.execute("select record_id, count(*) from element_texts where element_id = '1' and record_type = 'Item' group by record_id;")
-        for recordId, entryNum in self.__cursor.fetchall():
-            if entryNum > 1:
-                merge.append(recordId)
+        self.__cursor.execute("select record_id from element_texts where element_id = '1' and record_type = 'Item' group by record_id having count(record_id) > 1;")
+        merge = [item[0] for item in self.__cursor.fetchall()]
         return merge
 
     def query_both_records(self):
         # List all recordId with both text and Scripto entries and text entries is longer
         self.__cursor.execute(
             """select distinct(t1.record_id) from element_texts t1 join element_texts t2 on t1.record_id = t2.record_id
-            where t1.element_id = '1' and t2.element_id = '86' and char_length(t1.text) > char_length(t2.text)
+            where t1.element_id = '1' and t2.element_id = '86' and char_length(t1.text) > char_length(t2.text) and char_length(t1.text) >= 500
             and t1.record_id in (select distinct(record_id) from element_texts where element_id = '86' and record_type = 'Item'
             and record_id in (select record_id from element_texts where element_id = '1' and record_type = 'Item'));"""
         )
@@ -59,19 +56,11 @@ class MysqlOpn:
 
     def query_text_records(self):
         # List all finished recordId with only text field entries
-        self.__cursor.execute("""select distinct(record_id) from element_texts where element_id = '1' and record_type = 'Item' and record_id not in
+        self.__cursor.execute("""select distinct(record_id) from element_texts where element_id = '1' and 
+            record_type = 'Item' and char_length(text) >= 500 and record_id not in
             (select distinct(record_id) from element_texts where element_id = '86' and record_type = 'Item');""")
         text = [item[0] for item in self.__cursor.fetchall()]
         return text
-
-    def records_need_transfer(self, records):
-        transfer = []
-        for recordId in records:
-            self.__cursor.execute("select text from element_texts where element_id = '1' and record_type = 'Item' and record_id = {};".format(recordId))
-            text = self.__cursor.fetchone()
-            if len(text[0]) >= 500:
-                transfer.append(recordId)
-        return transfer
 
     def transfer_record(self, records):
         for recordId in records:

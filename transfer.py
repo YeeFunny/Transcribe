@@ -17,4 +17,3 @@ updateList = list(set(bothList + textList))
 mysqlOpn.delete_scripto_record(updateList)
 mysqlOpn.transfer_record(updateList)
 
-
