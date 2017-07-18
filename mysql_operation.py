@@ -39,9 +39,23 @@ class MysqlOpn:
 
     def query_merge_records(self):
         # List all records need to be merged
-        self.__cursor.execute("select record_id from element_texts where element_id = '1' and record_type = 'Item' group by record_id having count(record_id) > 1;")
-        merge = [item[0] for item in self.__cursor.fetchall()]
+        merge = {}
+        self.__cursor.execute("select record_id, count(record_id) from element_texts where element_id = '1' and record_type = 'Item' group by record_id having count(record_id) > 1;")
+        for record in self.__cursor.fetchall():
+            recordId = record[0]
+            recordNum = record[1]
+            merge[recordId] = recordNum
         return merge
+
+    def check_record_files(self, merge):
+        # Check records with same number of rows as number of files
+        keep = []
+        for recordId, recordNum in merge.items():
+            self.__cursor.execute("select count(*) from files where item_id = {};".format(recordId))
+            fileNum = self.__cursor.fetchone()[0]
+            if recordNum == fileNum:
+                keep.append(recordId)
+        return keep
 
     def query_both_records(self):
         # List all recordId with both text and Scripto entries and text entries is longer
@@ -67,23 +81,31 @@ class MysqlOpn:
             self.__cursor.execute("update element_texts set element_id = '86' where record_id = {} and record_type = 'Item' and element_id = '1';".format(recordId))
         self.__mysqlConn.commit()
 
+    def merge_text(self, record_id_list):
+        # Merge records with separate records
+        for recordId in record_id_list:
+            self.__cursor.execute(
+                """insert into temp_table('record_id', 'record_type', 'element_id', 'html', 'text')
+                select record_id, record_type, element_id, max(html), group_concat(text order by id separator ' ') from element_texts
+                where record_id = {} and element_id = '1' and record_type = 'Item' group by record_id;""".format(recordId)
+            )
+            self.__mysqlConn.commit()
+            self.__cursor.execute(
+                """insert into element_texts('record_id', 'record_type', 'element_id', 'html', 'text')
+                select record_id, record_type, element_id, html, text from temp_table;"""
+            )
+            self.__cursor.execute("truncate temp_table;")
+            self.__mysqlConn.commit()
+
+    def delete_separate_record(self, record_id_list):
+        for recordId in record_id_list:
+            self.__cursor.execute("delete from element_texts where record_id = {} and element_id = '1' and record_type = 'Item';".format(recordId))
+            self.__mysqlConn.commit()
+
     def delete_scripto_record(self, records):
         for recordId in records:
             self.__cursor.execute("delete from element_texts where element_id = '86' and record_id = {} and record_type = 'Item';".format(recordId))
             self.__mysqlConn.commit()
-
-    def merge_text(self, record_id_list):
-        # Merge entries
-        for recordId in record_id_list:
-            self.__cursor.execute(
-                """insert into temp_table
-                select min(id), record_id, record_type, element_id, max(html), group_concat(text order by id separator ' ') from element_texts
-                where record_id = {} and element_id = '1' and record_type = 'Item' group by record_id;""".format(recordId))
-            self.__cursor.execute("delete from element_texts where record_id = {} and element_id = '1' and record_type = 'Item';".format(recordId))
-        self.__mysqlConn.commit()
-        self.__cursor.execute("insert into element_texts select * from temp_table;")
-        self.__cursor.execute("truncate temp_table;")
-        self.__mysqlConn.commit()
 
     def concat_max_len(self, max_len):
         # Set group concat max length
