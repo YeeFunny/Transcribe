@@ -100,7 +100,7 @@ class MysqlOpn:
         for recordId in record_id_list:
             self.__cursor.execute(
                 """insert into temp_table(record_id, record_type, element_id, html, text)
-                select record_id, record_type, element_id, max(html), group_concat(text order by id separator ' ') from element_texts
+                select record_id, record_type, element_id, max(html), group_concat(text order by id separator '\n') from element_texts
                 where record_id = {} and element_id = '1' and record_type = 'Item' group by record_id;""".format(recordId)
             )
         self.__mysqlConn.commit()
