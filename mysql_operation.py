@@ -88,10 +88,10 @@ class MysqlOpn:
             for index, fileId in enumerate(fileIds):
                 self.__cursor.execute("""update element_texts set element_id = '86', record_id = {}, record_type = 'File'
                     where id = {};""".format(fileId, rowIds[index]))
-            self.__mysqlConn.commit()
+        self.__mysqlConn.commit()
 
-    def transfer_item_record(self, records):
-        for recordId in records:
+    def transfer_item_record(self, record_id_list):
+        for recordId in record_id_list:
             self.__cursor.execute("update element_texts set element_id = '86' where record_id = {} and record_type = 'Item' and element_id = '1';".format(recordId))
         self.__mysqlConn.commit()
 
